@@ -1,0 +1,47 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- script: |
+    #!/bin/bash
+
+    TEAMS_ENDPOINT="https://api.github.com/repos/sdevops713"
+    print_team_info() {
+        repo=$1
+        team_name=$2
+        permission=$3
+
+        # Print team information
+        echo "${repo},${team_name},${permission}" >> team_permissions.csv
+    }
+
+    echo "repo_name,team_name,permissions" > team_permissions.csv
+
+    tail -n +2 repositories.csv | while IFS=, read -r REPO; do
+        TEAMS_URL="${TEAMS_ENDPOINT}/${REPO}/teams"
+
+        # Fetch teams
+        teams=$(curl -s -H "Authorization: token $(TOKEN)" "${TEAMS_URL}" | jq -r '.[] | "\(.name),\(.permission)"')
+
+        # Process each team
+        IFS=$'\n'
+        for team in ${teams}; do
+            team_name=$(echo "${team}" | cut -d ',' -f 1)
+            permission=$(echo "${team}" | cut -d ',' -f 2)
+
+            # Print team information for the current repository
+            print_team_info "${REPO}" "${team_name}" "${permission}"
+        done
+    done
+
+
+
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(System.DefaultWorkingDirectory)/team_permissions.csv'
+    artifact: 'myArtifacts'
+    publishLocation: pipeline
+  displayName: 'Publish Artifacts'
