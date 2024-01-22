@@ -1,0 +1,22 @@
+- script: |
+    #!/bin/bash
+
+    ORG="sdevops713"
+    CSV_FILE="user_repo_associations.csv"
+    echo "Repository,User,OldRole,NewRole" > $CSV_FILE
+
+    tail -n +2 repositories.csv | while IFS=',' read -r REPO; do
+      USERS=$(curl -s -H "Authorization: token $(TOKEN)" "https://api.github.com/repos/$ORG/$REPO/collaborators" | jq -r '.[] | .login')
+      for USER in $USERS; do
+        OLD_ROLE=$(curl -s -H "Authorization: token $(TOKEN)" "https://api.github.com/repos/$ORG/$REPO/collaborators/$USER/permission" | jq -r '.permission')
+        if [[ $USER != "teamdevops128" ]]; then
+          curl -s -X PUT -H "Authorization: token $(TOKEN)" -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$ORG/$REPO/collaborators/$USER" \
+            -d '{"permission":"read"}'
+        fi
+        NEW_ROLE="read"
+        echo "$REPO,$USER,$OLD_ROLE,$NEW_ROLE" >> $CSV_FILE
+      done
+    done
+
+    echo "Process completed. Check $CSV_FILE for user and repository associations."
